@@ -106,12 +106,6 @@ def handle_solution_attempt(event, vk, questions, redis_db):
             message=f'Правильный ответ: {true_answer}".',
             keyboard=create_keyboard()
         )
-        vk.messages.send(
-            peer_id=event.peer_id,
-            random_id=get_random_id(),
-            message=f'{handle_new_question_request(event, vk, questions, redis_db)}',
-            keyboard=create_keyboard()
-        )
 
     else:
         vk.messages.send(
