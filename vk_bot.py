@@ -1,4 +1,5 @@
 import random
+import time
 import redis
 from environs import Env
 
@@ -25,7 +26,7 @@ def start(event, vk):
     vk.messages.send(
         peer_id=event.peer_id,
         random_id=get_random_id(),
-        message='Приветствую!\n\nЯ бот для викторин! Чтобы начать, нажмите кнопку "Новый вопрос"',
+        message='Я бот для викторин! Чтобы начать, нажмите кнопку "Новый вопрос"',
         keyboard=create_keyboard()
     )
 
@@ -53,10 +54,10 @@ def handle_new_question_request(event, vk, questions, redis_db):
 
 
 def update_score(vk_user_id, redis_db):
-    score = redis_conn.hget(vk_user_id, 'score')
+    score = redis_db.hget(vk_user_id, 'score')
     score = int(score) if score else 0
     score += 1
-    redis_conn.hset(vk_user_id, 'score', score)
+    redis_db.hset(vk_user_id, 'score', score)
 
 
 def get_score(vk_user_id, redis_db):
@@ -95,7 +96,7 @@ def handle_solution_attempt(event, vk, questions, redis_db):
         vk.messages.send(
             peer_id=event.peer_id,
             random_id=get_random_id(),
-            message='Правильно! Для следующего вопроса нажмите "Новый вопрос".',
+            message='Правильно!',
             keyboard=create_keyboard()
         )
 
@@ -103,9 +104,11 @@ def handle_solution_attempt(event, vk, questions, redis_db):
         vk.messages.send(
             peer_id=event.peer_id,
             random_id=get_random_id(),
-            message=f'Правильный ответ: {true_answer}".',
+            message=f'Правильный ответ: {true_answer} ',
             keyboard=create_keyboard()
         )
+        time.sleep(1)
+        handle_new_question_request(event, vk, questions, redis_db)
 
     else:
         vk.messages.send(
