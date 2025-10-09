@@ -1,3 +1,4 @@
 environs==14.3.0
 python-telegram-bot==13.5
-redis==6.4.0
+redis-server
+vk_api==11.10.0
