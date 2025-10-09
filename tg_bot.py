@@ -1,20 +1,40 @@
 import logging
 import random
 import redis
+import traceback
+import telegram
 
 from enum import Enum, auto
 from environs import Env
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler,)
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    Filters,
+    CallbackContext,
+    ConversationHandler,
+)
 
 from data_parsing import get_question_and_answer
 
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+class TelegramLogsHandler(logging.Handler):
+    def __init__(self, bot_token: str, chat_id: int):
+        super().__init__()
+        self.chat_id = chat_id
+        self.bot = telegram.Bot(token=bot_token)
+
+    def emit(self, record):
+        log_entry = self.format(record)
+        try:
+            self.bot.send_message(chat_id=self.chat_id, text=log_entry)
+        except Exception:
+            pass
+
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class Quiz(Enum):
@@ -110,10 +130,16 @@ def is_correct_answer(user_answer, correct_answer):
 def main():
     env = Env()
     env.read_env()
+
     telegram_token = env.str("TELEGRAM_TOKEN")
+    admin_chat_id = env.int("ADMIN_CHAT_ID")
+
+    tg_handler = TelegramLogsHandler(bot_token=telegram_token, chat_id=admin_chat_id)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    tg_handler.setFormatter(formatter)
+    logger.addHandler(tg_handler)
 
     keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счёт']]
-
     markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     redis_config = redis.StrictRedis(
@@ -159,4 +185,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        error_message = f"Произошла ошибка:\n{traceback.format_exc()}"
+        logger.error(error_message)
