@@ -7,14 +7,7 @@ import telegram
 from enum import Enum, auto
 from environs import Env
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import (
-    Updater,
-    CommandHandler,
-    MessageHandler,
-    Filters,
-    CallbackContext,
-    ConversationHandler,
-)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler)
 
 from data_parsing import get_question_and_answer
 
@@ -139,54 +132,56 @@ def main():
     tg_handler.setFormatter(formatter)
     logger.addHandler(tg_handler)
 
+    logger.info("Бот запущен и ожидает команд...")
+
     keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счёт']]
     markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    redis_config = redis.StrictRedis(
-        host='localhost',
-        port=6379,
-        db=0,
-        decode_responses=True
-    )
+    try:
+        redis_config = redis.StrictRedis(
+            host='localhost',
+            port=6379,
+            db=0,
+            decode_responses=True
+        )
 
-    question_and_answer = get_question_and_answer()
+        question_and_answer = get_question_and_answer()
 
-    updater = Updater(telegram_token)
-    dispatcher = updater.dispatcher
-    dispatcher.bot_data['markup'] = markup
-    dispatcher.bot_data['redis_config'] = redis_config
-    dispatcher.bot_data['question_and_answer'] = question_and_answer
+        updater = Updater(telegram_token)
+        dispatcher = updater.dispatcher
+        dispatcher.bot_data['markup'] = markup
+        dispatcher.bot_data['redis_config'] = redis_config
+        dispatcher.bot_data['question_and_answer'] = question_and_answer
 
-    conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("start", start),
-            MessageHandler(Filters.text("Мой счёт"), handle_score),
-        ],
-        states={
-            Quiz.NEW_QUESTION: [
-                CommandHandler("cancel", cancel),
-                MessageHandler(Filters.text("Новый вопрос"), handle_new_question),
+        conv_handler = ConversationHandler(
+            entry_points=[
+                CommandHandler("start", start),
                 MessageHandler(Filters.text("Мой счёт"), handle_score),
             ],
-            Quiz.ANSWER: [
-                CommandHandler("cancel", cancel),
-                MessageHandler(Filters.text("Мой счёт"), handle_score),
-                MessageHandler(Filters.text("Сдаться"), handle_give_up),
-                MessageHandler(Filters.text, handle_solution_attempt),
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
+            states={
+                Quiz.NEW_QUESTION: [
+                    CommandHandler("cancel", cancel),
+                    MessageHandler(Filters.text("Новый вопрос"), handle_new_question),
+                    MessageHandler(Filters.text("Мой счёт"), handle_score),
+                ],
+                Quiz.ANSWER: [
+                    CommandHandler("cancel", cancel),
+                    MessageHandler(Filters.text("Мой счёт"), handle_score),
+                    MessageHandler(Filters.text("Сдаться"), handle_give_up),
+                    MessageHandler(Filters.text, handle_solution_attempt),
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel)],
+        )
 
-    dispatcher.add_handler(conv_handler)
+        dispatcher.add_handler(conv_handler)
 
-    updater.start_polling()
-    updater.idle()
+        updater.start_polling()
+        updater.idle()
+
+    except Exception:
+        logger.error(f"Бот упал с ошибкой:\n{traceback.format_exc()}")
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception:
-        error_message = f"Произошла ошибка:\n{traceback.format_exc()}"
-        logger.error(error_message)
+    main()
