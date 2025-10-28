@@ -130,9 +130,10 @@ def main():
     longpoll = VkLongPoll(vk_session)
 
     redis_db = redis.StrictRedis(
-        host='localhost',
-        port=6379,
+        host=env.str("REDIS_HOST", "localhost"),
+        port=env.int("REDIS_PORT", 6379),
         db=0,
+        password=env.str("REDIS_PASSWORD", None),
         decode_responses=True
     )
 

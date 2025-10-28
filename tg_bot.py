@@ -12,6 +12,10 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Call
 from data_parsing import get_question_and_answer
 
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
 class TelegramLogsHandler(logging.Handler):
     def __init__(self, bot_token: str, chat_id: int):
         super().__init__()
@@ -24,10 +28,6 @@ class TelegramLogsHandler(logging.Handler):
             self.bot.send_message(chat_id=self.chat_id, text=log_entry)
         except Exception:
             pass
-
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class Quiz(Enum):
@@ -45,24 +45,24 @@ def start(update: Update, context: CallbackContext) -> Quiz:
 
 
 def handle_new_question(update: Update, context: CallbackContext) -> Quiz:
-    redis_config = context.bot_data['redis_config']
+    redis_db = context.bot_data['redis_config']
     question_and_answer = context.bot_data['question_and_answer']
     user_id = update.effective_user.id
     question = random.choice(list(question_and_answer.keys()))
     answer = question_and_answer[question]
 
-    redis_config.set(f"user:{user_id}:question", question)
-    redis_config.set(f"user:{user_id}:answer", answer)
+    redis_db.set(f"user:{user_id}:question", question)
+    redis_db.set(f"user:{user_id}:answer", answer)
 
     update.message.reply_text(question)
     return Quiz.ANSWER
 
 
 def handle_solution_attempt(update: Update, context: CallbackContext) -> Quiz:
-    redis_config = context.bot_data['redis_config']
+    redis_db = context.bot_data['redis_config']
     user_id = update.effective_user.id
     user_answer = update.message.text.strip().lower()
-    correct_answer = redis_config.get(f"user:{user_id}:answer")
+    correct_answer = redis_db.get(f"user:{user_id}:answer")
 
     if not correct_answer:
         update.message.reply_text("Сначала нажмите 'Новый вопрос'.")
@@ -70,9 +70,9 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> Quiz:
 
     if is_correct_answer(user_answer, correct_answer):
         update.message.reply_text("Правильно! 🎉")
-        redis_config.incr(f"user:{user_id}:score")
-        redis_config.delete(f"user:{user_id}:question")
-        redis_config.delete(f"user:{user_id}:answer")
+        redis_db.incr(f"user:{user_id}:score")
+        redis_db.delete(f"user:{user_id}:question")
+        redis_db.delete(f"user:{user_id}:answer")
         return Quiz.NEW_QUESTION
     else:
         update.message.reply_text("Неправильно. Попробуйте ещё раз.")
@@ -80,33 +80,33 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> Quiz:
 
 
 def handle_give_up(update: Update, context: CallbackContext) -> Quiz:
-    redis_config = context.bot_data['redis_config']
+    redis_db = context.bot_data['redis_config']
     question_and_answer = context.bot_data['question_and_answer']
     user_id = update.effective_user.id
-    answer = redis_config.get(f"user:{user_id}:answer")
+    answer = redis_db.get(f"user:{user_id}:answer")
 
     if answer:
         update.message.reply_text(f"Правильный ответ: {answer}")
     else:
         update.message.reply_text("Нет активного вопроса.")
 
-    redis_config.delete(f"user:{user_id}:question")
-    redis_config.delete(f"user:{user_id}:answer")
+    redis_db.delete(f"user:{user_id}:question")
+    redis_db.delete(f"user:{user_id}:answer")
 
     question = random.choice(list(question_and_answer.keys()))
     new_answer = question_and_answer[question]
 
-    redis_config.set(f"user:{user_id}:question", question)
-    redis_config.set(f"user:{user_id}:answer", new_answer)
+    redis_db.set(f"user:{user_id}:question", question)
+    redis_db.set(f"user:{user_id}:answer", new_answer)
 
     update.message.reply_text(question)
     return Quiz.ANSWER
 
 
 def handle_score(update: Update, context: CallbackContext) -> None:
-    redis_config = context.bot_data['redis_config']
+    redis_db = context.bot_data['redis_config']
     user_id = update.effective_user.id
-    score = redis_config.get(f"user:{user_id}:score") or 0
+    score = redis_db.get(f"user:{user_id}:score") or 0
     update.message.reply_text(f"Ваш счёт: {score}")
 
 
@@ -138,10 +138,11 @@ def main():
     markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     try:
-        redis_config = redis.StrictRedis(
-            host='localhost',
-            port=6379,
+        redis_db = redis.StrictRedis(
+            host=env.str("REDIS_HOST", "localhost"),
+            port=env.int("REDIS_PORT", 6379),
             db=0,
+            password=env.str("REDIS_PASSWORD", None),
             decode_responses=True
         )
 
@@ -150,7 +151,7 @@ def main():
         updater = Updater(telegram_token)
         dispatcher = updater.dispatcher
         dispatcher.bot_data['markup'] = markup
-        dispatcher.bot_data['redis_config'] = redis_config
+        dispatcher.bot_data['redis_config'] = redis_db
         dispatcher.bot_data['question_and_answer'] = question_and_answer
 
         conv_handler = ConversationHandler(
