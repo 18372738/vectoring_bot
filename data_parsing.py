@@ -1,14 +1,8 @@
 import re
 import os
-from environs import Env
 
 
-def get_question_and_answer():
-    env = Env()
-    env.read_env()
-
-    file_path = env.str("QUESTIONS_FILE_PATH")
-
+def get_question_and_answer(file_path):
     with open(file_path, "r", encoding="KOI8-R") as my_file:
         file_contents = my_file.read()
 

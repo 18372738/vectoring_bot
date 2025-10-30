@@ -13,7 +13,6 @@ from data_parsing import get_question_and_answer
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class TelegramLogsHandler(logging.Handler):
@@ -126,11 +125,13 @@ def main():
 
     telegram_token = env.str("TELEGRAM_TOKEN")
     admin_chat_id = env.int("ADMIN_CHAT_ID")
+    file_path = env.str("QUESTIONS_FILE_PATH")
 
     tg_handler = TelegramLogsHandler(bot_token=telegram_token, chat_id=admin_chat_id)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     tg_handler.setFormatter(formatter)
     logger.addHandler(tg_handler)
+    logger.setLevel(logging.INFO)
 
     logger.info("Бот запущен и ожидает команд...")
 
@@ -146,7 +147,7 @@ def main():
             decode_responses=True
         )
 
-        question_and_answer = get_question_and_answer()
+        question_and_answer = get_question_and_answer(file_path)
 
         updater = Updater(telegram_token)
         dispatcher = updater.dispatcher

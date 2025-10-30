@@ -120,11 +120,12 @@ def handle_solution_attempt(event, vk, questions, redis_db):
 
 
 def main():
-
     env = Env()
     env.read_env()
 
     vk_token = env.str("VK_TOKEN")
+    file_path = env.str("QUESTIONS_FILE_PATH")
+
     vk_session = vk_api.VkApi(token=vk_token)
     vk = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
@@ -137,7 +138,7 @@ def main():
         decode_responses=True
     )
 
-    questions = get_question_and_answer()
+    questions = get_question_and_answer(file_path)
 
     print("Бот запущен.")
 
